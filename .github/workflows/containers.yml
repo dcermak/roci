@@ -1,0 +1,54 @@
+---
+name: build container images
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: '0 2 * * *'  # 2 AM UTC daily
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        dist:
+          - "rawhide"
+          - "44"
+          - "43"
+          - "42"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up buildah
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y buildah
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'schedule'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | buildah login -u ${{ github.actor }} --password-stdin ${{ env.REGISTRY }}
+
+      - name: Build container image
+        run: |
+          buildah bud --layers --build-arg=DIST=${{ matrix.dist }} \
+            -f container-images/fedora-rpm-buildroot.containerfile \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/fedora-rpm-buildroot:${{ matrix.dist }}
+
+      - name: Push to registry
+        if: github.event_name == 'schedule'
+        run: |
+          buildah push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/fedora-rpm-buildroot:${{ matrix.dist }}
