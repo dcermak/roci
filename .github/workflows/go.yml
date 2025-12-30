@@ -1,0 +1,37 @@
+---
+name: go build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: install required dependencies
+        run: |
+          sudo apt update
+          sudo apt install libbtrfs-dev libgpgme-dev
+
+      - name: set up go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Cache Go modules
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - run: go build -v ./...
+
+      - name: unit test
+        run: go test -v ./...
