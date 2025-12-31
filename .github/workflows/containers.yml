@@ -44,9 +44,8 @@ jobs:
 
       - name: Build container image
         run: |
-          buildah bud --layers --build-arg=DIST=${{ matrix.dist }} \
-            -f container-images/fedora-rpm-buildroot.containerfile \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/fedora-rpm-buildroot:${{ matrix.dist }}
+          ./build-fedora-rpm-buildroot-ctr.sh ${{ matrix.dist }}
+          buildah tag fedora-rpm-buildroot:${{ matrix.dist }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/fedora-rpm-buildroot:${{ matrix.dist }}
 
       - name: Push to registry
         if: github.event_name == 'schedule'
