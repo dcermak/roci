@@ -13,12 +13,18 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/containers/buildah"
 	"github.com/containers/buildah/define"
 	"github.com/containers/buildah/imagebuildah"
+
+	// keep this at v5 for now, v6 requires cyphar/filepath-securejoin >=0.6.1
+	// which is incompatible with podman's ctr/storage
+	"github.com/go-git/go-git/v5"
 	"github.com/google/rpmpack"
 	"github.com/urfave/cli/v3"
+
 	"go.podman.io/image/v5/docker/reference"
 	"go.podman.io/image/v5/pkg/blobinfocache/none"
 	"go.podman.io/image/v5/pkg/compression"
@@ -196,11 +202,34 @@ func (b *Build) commonBuildArgs() map[string]string {
 	return args
 }
 
+func (b *Build) getDistGitHeadCommitTime() (*time.Time, error) {
+	r, err := git.PlainOpen(b.distGit)
+	if err != nil {
+		return nil, err
+	}
+
+	ref, err := r.Head()
+	if err != nil {
+		return nil, err
+	}
+
+	commit, err := r.CommitObject(ref.Hash())
+	if err != nil {
+		return nil, err
+	}
+
+	return &commit.Author.When, nil
+}
+
 func (b *Build) buildStage(targetStage string, outputTag string, withNetwork bool) (string, reference.Canonical, error) {
-	// FIXME: need to set sourcedateepoch here
+	// err => no SOURCE_DATE_EPOCH for you!
+	headCommitTime, _ := b.getDistGitHeadCommitTime()
+
 	buildOptions := define.BuildOptions{
 		Target: targetStage,
 		Output: outputTag,
+
+		SourceDateEpoch: headCommitTime,
 
 		Args:             b.commonBuildArgs(),
 		ContextDirectory: b.distGit,
