@@ -61,7 +61,13 @@ func main() {
 						Name:    "release",
 						Aliases: []string{"r"},
 						Value:   "",
-						Usage:   "Distribution release to target",
+						Usage:   "distribution release to target",
+					},
+					&cli.StringFlag{
+						Name:    "output-dir",
+						Aliases: []string{"o"},
+						Value:   "",
+						Usage:   "directory where the resulting rpms are written to, defaults to '$distGit/results_$pkgName/'",
 					},
 				},
 			},
@@ -76,12 +82,22 @@ func main() {
 }
 
 type Build struct {
-	store       storage.Store
-	config      roci.Config
-	distGit     string
+	// container image store
+	store storage.Store
+	// loaded config
+	config roci.Config
+	// directory with the containerfile + sources
+	distGit string
+	// filename of the containerfile/dockerfile, defaults to `containerfile`
 	buildRecipe string
-	distTag     string
-	ctx         context.Context
+	// Tag of the container image corresponding to distribution for which we
+	// are building. E.g. for Fedora it's 43 for f43
+	distCtrTag string
+	// common context for the operations that need one
+	ctx context.Context
+	// directory where the created rpms are written to, defaults to
+	// `$distGit/results_$pkgName/`
+	rpmOutDir string
 }
 
 func releaseToDistTag(release string) string {
@@ -96,8 +112,9 @@ func releaseToDistTag(release string) string {
 	}
 }
 
-// NewBuild creates a new Build from the
-func NewBuild(ctx context.Context, cmd *cli.Command) (*Build, error) {
+// NewBuildFromCLI creates a new Build from the command line parameters received
+// via `cmd`
+func NewBuildFromCLI(ctx context.Context, cmd *cli.Command) (*Build, error) {
 	// we must store the dist-git dir as the absolute path, as we will be
 	// using it as build context in the user namespace. There we loose the
 	// current working directory and a relative path will resolve wrongly
@@ -138,13 +155,19 @@ func NewBuild(ctx context.Context, cmd *cli.Command) (*Build, error) {
 		return nil, err
 	}
 
+	rpmOutDir := cmd.String("output-dir")
+	if rpmOutDir == "" {
+		rpmOutDir = filepath.Join(distGitDir, fmt.Sprintf("result_%s", config.Name))
+	}
+
 	return &Build{
 		store:       store,
 		config:      *config,
 		distGit:     distGitDir,
 		buildRecipe: cmd.String("file"),
-		distTag:     releaseToDistTag(cmd.String("release")),
+		distCtrTag:  releaseToDistTag(cmd.String("release")),
 		ctx:         ctx,
+		rpmOutDir:   rpmOutDir,
 	}, nil
 }
 
@@ -159,7 +182,7 @@ func (b *Build) commonBuildArgs() map[string]string {
 		Name  string
 		Value string
 	}{
-		{"DIST", b.distTag},
+		{"DIST", b.distCtrTag},
 		{"VERSION", b.config.Version},
 		{"NAME", b.config.Name},
 		{"RELEASE", b.config.Release},
@@ -505,8 +528,8 @@ func (b *Build) RpmFromLayer(id string, rpmPkg roci.RpmPackage) (*rpmpack.RPM, e
 	if err != nil {
 		return nil, err
 	}
+	// metadata collection done
 
-	// Assembly time!!
 	rpm, err := rpmpack.NewRPM(m)
 	if err != nil {
 		return nil, err
@@ -548,12 +571,42 @@ func (b *Build) RpmFromLayer(id string, rpmPkg roci.RpmPackage) (*rpmpack.RPM, e
 	return rpm, nil
 }
 
+// WriteRPMToOutDir writes the supplied rpm to the rpmOutDir of this build. It
+// uses the standard rpm filename format `$name-$version-$release.$arch.rpm`
+func (b *Build) WriteRPMToOutDir(rpm *rpmpack.RPM) error {
+	if err := os.MkdirAll(b.rpmOutDir, 0755); err != nil {
+		return err
+	}
+	rpmPath := filepath.Join(
+		b.rpmOutDir,
+		fmt.Sprintf("%s-%s-%s.%s.rpm", rpm.Name, rpm.Version, rpm.Release, rpm.Arch),
+	)
+	f, err := os.Create(rpmPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return rpm.Write(f)
+}
+
+func (b *Build) BuildAndWriteRPMForPackage(pkg roci.RpmPackage) error {
+	id, _, err := b.buildStage(pkg.Name, pkg.Name, false, false)
+	if err != nil {
+		return err
+	}
+	rpm, err := b.RpmFromLayer(id, pkg)
+	if err != nil {
+		return err
+	}
+	return b.WriteRPMToOutDir(rpm)
+}
+
 func buildCommand(ctx context.Context, cmd *cli.Command) error {
 	if cmd.NArg() < 1 {
 		return fmt.Errorf("dist-git directory path is required")
 	}
 
-	build, err := NewBuild(ctx, cmd)
+	build, err := NewBuildFromCLI(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -567,27 +620,15 @@ func buildCommand(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// main package
-	if id, _, err := build.buildStage(build.config.Name, build.config.Name, false); err != nil {
+	err = build.BuildAndWriteRPMForPackage(build.config.RpmPackage)
+	if err != nil {
 		return err
-	} else {
-		rpm, err := build.RpmFromLayer(id, build.config.RpmPackage)
-		if err != nil {
-			return err
-		}
-		rpmPath := filepath.Join(build.distGit, build.config.Name+".rpm")
-		f, err := os.Create(rpmPath)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		if err := rpm.Write(f); err != nil {
-			return err
-		}
-
 	}
 
-	for _, v := range build.config.Package {
-		if _, _, err := build.buildStage(v.Name, v.Name, false); err != nil {
+	// subpackages
+	for _, pkg := range build.config.Package {
+		err = build.BuildAndWriteRPMForPackage(pkg)
+		if err != nil {
 			return err
 		}
 	}
