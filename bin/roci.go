@@ -221,7 +221,7 @@ func (b *Build) getDistGitHeadCommitTime() (*time.Time, error) {
 	return &commit.Author.When, nil
 }
 
-func (b *Build) buildStage(targetStage string, outputTag string, withNetwork bool) (string, reference.Canonical, error) {
+func (b *Build) buildStage(targetStage string, outputTag string, withNetwork bool, layers bool) (string, reference.Canonical, error) {
 	// err => no SOURCE_DATE_EPOCH for you!
 	headCommitTime, _ := b.getDistGitHeadCommitTime()
 
@@ -237,7 +237,7 @@ func (b *Build) buildStage(targetStage string, outputTag string, withNetwork boo
 		// these two must be false so that the layers on top of the base
 		// image are squashed
 		NoCache: false,
-		Layers:  false,
+		Layers:  layers,
 
 		// emit useful output
 		Out: os.Stdout,
@@ -255,11 +255,11 @@ func (b *Build) buildStage(targetStage string, outputTag string, withNetwork boo
 }
 
 func (b *Build) executeBuildRequires() (string, reference.Canonical, error) {
-	return b.buildStage("buildrequires", fmt.Sprintf("%s-buildrequires", b.config.Name), true)
+	return b.buildStage("buildrequires", fmt.Sprintf("%s-buildrequires", b.config.Name), true, true)
 }
 
 func (b *Build) executeBuild() (string, reference.Canonical, error) {
-	return b.buildStage("build", fmt.Sprintf("%s-build", b.config.Name), false)
+	return b.buildStage("build", fmt.Sprintf("%s-build", b.config.Name), false, true)
 }
 
 // ImageFromId returns an image from the image store given the supplied id.
