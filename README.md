@@ -89,7 +89,7 @@ The following OCI annotations/labels are directly converted into RPM tags:
 
 - `org.opencontainers.image.version` -> `Version`
 - `org.opencontainers.image.url` -> `URL`
-- `org.opencontainers.image.title` -> `Sumary`
+- `org.opencontainers.image.title` -> `Summary`
 - `org.opencontainers.image.description` -> `Description`
 - `org.opencontainers.image.licenses` -> `License`
 
@@ -129,12 +129,30 @@ config file, are ignored.
 
 ## AutoReqProv
 
+RPM supports automatic provides and requires generation from package file
+contents, also called `AutoReqProv`. It is nowadays generally enabled and
+absolutely crucial for modern packaging workflows.
+
+`roci` generates automatic provides & requires using `rpmdeps`. This binary used
+to be used for `AutoReqProv` in the past, but nowadays rpm does that
+internally. Yet the binary remains and can be used. `roci` launches `rpmdeps` in
+the `$name` and `$subpkg-name` containers, parses its output and inserts the
+result into the fully assembled rpm.
 
 
 ## RPM Spec patterns in `Containerfile`
 
 Dockerfiles do not support typical rpm constructs like `%bcond` or
-macros. However, certain 
+macros.
+
+`roci` supports a few ways to circumvent this limitation:
+
+- common compiler flags are exported as environment variables in the
+  `${distro}-rpm-buildroot` container images
+
+- The common directory macros like `%_bindir` or `%_mandir` are passed as build
+  arguments during the build with the name in uppercase and without the leading
+  `_`. I.e. if you want to put something into `%_bindir`, then 
 
 
 # Usage
