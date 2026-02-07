@@ -7,8 +7,8 @@ require (
 	github.com/go-git/go-git/v5 v5.16.4
 	github.com/google/rpmpack v0.7.1
 	github.com/urfave/cli/v3 v3.6.2
-	go.podman.io/image/v5 v5.38.0
-	go.podman.io/storage v1.61.0
+	go.podman.io/image/v5 v5.39.1
+	go.podman.io/storage v1.62.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
