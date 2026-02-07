@@ -3,12 +3,12 @@ module github.com/dcermak/roci
 go 1.25.4
 
 require (
-	github.com/containers/buildah v1.42.2
+	github.com/containers/buildah v1.43.0
 	github.com/go-git/go-git/v5 v5.16.4
 	github.com/google/rpmpack v0.7.1
 	github.com/urfave/cli/v3 v3.6.2
-	go.podman.io/image/v5 v5.38.0
-	go.podman.io/storage v1.61.0
+	go.podman.io/image/v5 v5.39.1
+	go.podman.io/storage v1.62.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -134,7 +134,7 @@ require (
 	go.opentelemetry.io/otel v1.36.0 // indirect
 	go.opentelemetry.io/otel/metric v1.36.0 // indirect
 	go.opentelemetry.io/otel/trace v1.36.0 // indirect
-	go.podman.io/common v0.66.0 // indirect
+	go.podman.io/common v0.67.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/mod v0.31.0 // indirect
