@@ -4,7 +4,7 @@ go 1.25.4
 
 require (
 	github.com/containers/buildah v1.42.2
-	github.com/go-git/go-git/v5 v5.16.4
+	github.com/go-git/go-git/v5 v5.16.5
 	github.com/google/rpmpack v0.7.1
 	github.com/urfave/cli/v3 v3.6.2
 	go.podman.io/image/v5 v5.38.0
